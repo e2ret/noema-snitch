@@ -62,7 +62,7 @@ enum Demo {
         ]
         let prompt = PromptRequest(pid: 402, executablePath: apps[5].0, appName: "Mail",
                                    remoteIP: "74.208.5.20", remotePort: 993, host: "imap.mail.com",
-                                   deadline: Date().addingTimeInterval(55))
+                                   deadline: nil)
         helper.loadDemo(rules: rules, prompts: [prompt])
     }
 

@@ -67,6 +67,7 @@ final class HelperClient: ObservableObject {
     func loadDemo(rules: [Rule], prompts: [PromptRequest]) {
         self.rules = rules
         self.prompts = prompts
+        isConnected = true  // screenshots show a working setup
     }
 
     func clearEvents() {

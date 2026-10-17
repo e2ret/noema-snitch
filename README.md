@@ -8,7 +8,17 @@
 A Little Snitch–style network monitor and firewall for macOS, written from scratch in Swift/SwiftUI.
 Russian and English UI (follows the system language). No paid Apple Developer account required.
 
-![Монитор сети](docs/screenshots/monitor-globe-ru.png)
+![Монитор сети](docs/screenshots/monitor.png)
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/alert.png" alt="Окно «Разрешить / Запретить»"><br><sub>Запрос на соединение — ждёт вашего ответа</sub></td>
+<td width="50%"><img src="docs/screenshots/rules.png" alt="Правила"><br><sub>Правила по процессам</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/settings.png" alt="Настройки"><br><sub>Настройки: помощник, режимы, фильтрация</sub></td>
+</tr>
+</table>
 
 ## Возможности
 
