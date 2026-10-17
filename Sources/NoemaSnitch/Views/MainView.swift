@@ -47,9 +47,11 @@ struct MainView: View {
                         .padding(.vertical, 20)
                         .frame(maxWidth: .infinity)
                 }
-                .navigationTitle(Text("section.settings"))
             }
         }
+        // Fill the window whatever the section, so switching never resizes it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle(Text("app.name"))
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("", selection: $section) {

@@ -43,7 +43,6 @@ struct MonitorView: View {
                     .frame(width: 320)
             }
         }
-        .navigationTitle(Text("monitor.title"))
         .onAppear {
             if Demo.isEnabled {
                 if let safari = model.sortedApps.first(where: { $0.name == "Safari" }) {

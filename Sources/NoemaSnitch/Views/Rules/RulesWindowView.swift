@@ -83,7 +83,7 @@ struct RulesWindowView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(selection: $filter) {
                 Section("rules.section") {
                     ForEach(RulesFilter.allCases) { f in
@@ -97,8 +97,9 @@ struct RulesWindowView: View {
                     }
                 }
             }
-            .navigationSplitViewColumnWidth(min: 190, ideal: 210)
-        } detail: {
+            .listStyle(.sidebar)
+            .frame(width: 210)
+            Divider()
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
                     header
@@ -112,8 +113,6 @@ struct RulesWindowView: View {
                     .frame(width: 300)
             }
         }
-        .searchable(text: $search, placement: .toolbar, prompt: Text("rules.search"))
-        .navigationTitle(Text("rules.title"))
     }
 
     private var header: some View {
@@ -134,6 +133,15 @@ struct RulesWindowView: View {
                     .foregroundStyle(.orange)
                     .font(.caption)
             }
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("rules.search", text: $search).textFieldStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(width: 220)
+            .background(.background.opacity(0.6), in: RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(.separator))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

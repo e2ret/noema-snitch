@@ -41,7 +41,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let directory = Demo.snapshotDirectory {
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 Demo.snapshot(to: directory)
-                NSApp.terminate(nil)
+                guard CommandLine.arguments.contains("--cycle-sections") else { return NSApp.terminate(nil) }
+                // Switch sections inside one session to check the window keeps its size.
+                for (i, section) in MainSection.allCases.enumerated() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i + 1)) {
+                        UserDefaults.standard.set(section.rawValue, forKey: MainSection.storageKey)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                            Demo.snapshot(to: directory.appendingPathComponent(section.rawValue))
+                        }
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { NSApp.terminate(nil) }
             }
         }
     }
@@ -60,6 +70,7 @@ struct NoemaSnitchApp: App {
                 .frame(minWidth: 760, minHeight: 520)
         }
         .defaultSize(width: 1180, height: 720)
+        .windowResizability(.contentMinSize)
 
         MenuBarExtra {
             StatusMenuView()
