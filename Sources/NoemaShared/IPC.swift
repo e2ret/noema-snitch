@@ -1,0 +1,150 @@
+import Foundation
+
+/// Newline-delimited JSON over a Unix socket between the app (user) and the helper (root).
+public enum IPC {
+    public static let socketPath = "/var/run/com.noema.snitch.sock"
+    public static let version = "1"
+
+    public static func encode<T: Encodable>(_ value: T) -> Data? {
+        try? JSONEncoder().encode(value)
+    }
+
+    public static func decode<T: Decodable>(_ type: T.Type, from data: Data) -> T? {
+        try? JSONDecoder().decode(type, from: data)
+    }
+}
+
+public enum FilterMode: String, Codable, CaseIterable, Hashable {
+    /// Ask about every connection without a rule.
+    case alert
+    /// Allow connections without a rule, without asking.
+    case silentAllow
+    /// Deny connections without a rule, without asking.
+    case silentDeny
+}
+
+public struct HelperSettings: Codable, Hashable {
+    /// When off, pf redirection is removed and traffic flows untouched.
+    public var filteringEnabled = true
+    public var mode: FilterMode = .alert
+    /// Block UDP 443 so browsers fall back from QUIC to filterable TCP.
+    public var blockQUIC = true
+    /// Seconds the prompt waits before denying.
+    public var promptTimeout = 60
+    /// What to do when no app is connected to ask the user.
+    public var actionWithoutUI: RuleAction = .allow
+
+    public init() {}
+}
+
+public struct PromptRequest: Codable, Identifiable, Hashable {
+    public var id = UUID()
+    public var pid: Int32
+    public var executablePath: String
+    public var appName: String
+    public var remoteIP: String
+    public var remotePort: Int
+    /// From TLS SNI or HTTP Host header, when the client sent one.
+    public var host: String?
+    public var deadline: Date
+
+    public init(pid: Int32, executablePath: String, appName: String, remoteIP: String,
+                remotePort: Int, host: String?, deadline: Date) {
+        self.pid = pid
+        self.executablePath = executablePath
+        self.appName = appName
+        self.remoteIP = remoteIP
+        self.remotePort = remotePort
+        self.host = host
+        self.deadline = deadline
+    }
+}
+
+public struct Verdict: Codable, Hashable {
+    public var requestID: UUID
+    public var action: RuleAction
+    public var lifetime: RuleLifetime
+    /// Host, IP or "*.domain" the rule covers; nil = any connection of the app.
+    public var hostPattern: String?
+
+    public init(requestID: UUID, action: RuleAction, lifetime: RuleLifetime, hostPattern: String?) {
+        self.requestID = requestID
+        self.action = action
+        self.lifetime = lifetime
+        self.hostPattern = hostPattern
+    }
+}
+
+public enum DecisionReason: String, Codable {
+    case rule, user, timeout, noUI, filteringOff, silent
+}
+
+public struct TrafficEvent: Codable, Identifiable, Hashable {
+    public var id = UUID()
+    public var date = Date()
+    public var pid: Int32
+    public var executablePath: String
+    public var appName: String
+    public var remoteIP: String
+    public var remotePort: Int
+    public var host: String?
+    public var action: RuleAction
+    public var reason: DecisionReason
+
+    public init(pid: Int32, executablePath: String, appName: String, remoteIP: String,
+                remotePort: Int, host: String?, action: RuleAction, reason: DecisionReason) {
+        self.pid = pid
+        self.executablePath = executablePath
+        self.appName = appName
+        self.remoteIP = remoteIP
+        self.remotePort = remotePort
+        self.host = host
+        self.action = action
+        self.reason = reason
+    }
+}
+
+/// Bytes moved since the previous report for one app + host, plus open connections.
+public struct TrafficEntry: Codable, Hashable {
+    public var executablePath: String
+    public var appName: String
+    public var pid: Int32
+    public var host: String?
+    public var ip: String
+    public var port: Int
+    public var sent: Int64
+    public var received: Int64
+    public var active: Int
+
+    public init(executablePath: String, appName: String, pid: Int32, host: String?, ip: String,
+                port: Int, sent: Int64, received: Int64, active: Int) {
+        self.executablePath = executablePath
+        self.appName = appName
+        self.pid = pid
+        self.host = host
+        self.ip = ip
+        self.port = port
+        self.sent = sent
+        self.received = received
+        self.active = active
+    }
+}
+
+/// Helper → app.
+public enum HelperMessage: Codable {
+    case hello(version: String, settings: HelperSettings)
+    case rules([Rule])
+    case prompt(PromptRequest)
+    case promptResolved(UUID)
+    case event(TrafficEvent)
+    case traffic(date: Date, entries: [TrafficEntry])
+}
+
+/// App → helper.
+public enum ClientMessage: Codable {
+    case hello
+    case verdict(Verdict)
+    case upsertRule(Rule)
+    case deleteRules([UUID])
+    case setSettings(HelperSettings)
+}

@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+build/
+node_modules/
+.npm-cache/
+# Reference apps for analysis only — third-party, never commit
+Little Snitch.app/
+LuLu.app/

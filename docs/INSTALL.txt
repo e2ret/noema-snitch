@@ -1,0 +1,43 @@
+NOEMA SNITCH — УСТАНОВКА / INSTALLATION
+=======================================
+
+РУССКИЙ
+
+1. Перетащите «Noema Snitch» в папку «Программы».
+2. Первый запуск: приложение не подписано сертификатом Apple, поэтому macOS
+   его не откроет двойным щелчком. Сделайте так:
+     • щёлкните по приложению правой кнопкой → «Открыть» → «Открыть»;
+   или, если macOS пишет, что приложение повреждено, выполните в Терминале:
+     xattr -dr com.apple.quarantine "/Applications/Noema Snitch.app"
+3. В окне «Монитор сети» нажмите «Установить помощника…» и введите пароль
+   администратора. Помощник — системная служба, которая фильтрует соединения;
+   он запускается сам при включении Mac.
+4. По желанию: Настройки → «Открывать при входе в систему».
+
+Если пропал интернет: Настройки → «Удалить помощника…»
+или в Терминале:
+  sudo launchctl bootout system/com.noema.snitch.helper
+  sudo pfctl -a com.apple/noemasnitch -F all
+
+Данные IP-геолокации: DB-IP (https://db-ip.com), лицензия CC BY 4.0.
+
+
+ENGLISH
+
+1. Drag “Noema Snitch” into the Applications folder.
+2. First launch: the app is not signed with an Apple certificate, so macOS
+   won't open it with a double-click. Instead:
+     • right-click the app → Open → Open;
+   or, if macOS says the app is damaged, run in Terminal:
+     xattr -dr com.apple.quarantine "/Applications/Noema Snitch.app"
+3. In the Network Monitor click “Install Helper…” and enter an administrator
+   password. The helper is a system service that filters connections; it
+   starts by itself when the Mac boots.
+4. Optional: Settings → “Open at login”.
+
+If the network stops working: Settings → “Remove Helper…”
+or in Terminal:
+  sudo launchctl bootout system/com.noema.snitch.helper
+  sudo pfctl -a com.apple/noemasnitch -F all
+
+IP geolocation data: DB-IP (https://db-ip.com), CC BY 4.0.
