@@ -143,3 +143,4 @@
 "section.monitor" = "Monitor";
 "section.rules" = "Rules";
 "section.settings" = "Settings";
+"settings.noLimit" = "No limit — wait for my answer";

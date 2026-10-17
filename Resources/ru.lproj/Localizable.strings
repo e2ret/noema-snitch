@@ -143,3 +143,4 @@
 "section.monitor" = "Монитор";
 "section.rules" = "Правила";
 "section.settings" = "Настройки";
+"settings.noLimit" = "Без ограничения — ждать ответа";

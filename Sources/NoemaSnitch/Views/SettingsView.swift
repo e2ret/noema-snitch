@@ -43,7 +43,8 @@ struct SettingsView: View {
                 }
                 Toggle("settings.blockQUIC", isOn: setting(\.blockQUIC))
                 Picker("settings.promptTimeout", selection: setting(\.promptTimeout)) {
-                    ForEach([15, 30, 60, 120], id: \.self) { Text("settings.seconds \($0)").tag($0) }
+                    Text("settings.noLimit").tag(0)
+                    ForEach([30, 60, 120, 300], id: \.self) { Text("settings.seconds \($0)").tag($0) }
                 }
                 Picker("settings.withoutUI", selection: setting(\.actionWithoutUI)) {
                     Text("rule.allow").tag(RuleAction.allow)

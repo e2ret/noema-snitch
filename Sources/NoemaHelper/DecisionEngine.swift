@@ -77,17 +77,30 @@ final class DecisionEngine {
                 remoteIP: request.destination.ip,
                 remotePort: Int(request.destination.port),
                 host: request.host,
-                deadline: Date().addingTimeInterval(TimeInterval(settings.promptTimeout))
+                deadline: settings.promptTimeout > 0
+                    ? Date().addingTimeInterval(TimeInterval(settings.promptTimeout)) : nil
             )
             pending[key] = Pending(prompt: prompt, request: request, completions: [wrapped])
             ipc?.broadcast(.prompt(prompt))
 
             let promptID = prompt.id
+            guard settings.promptTimeout > 0 else { return }
             queue.asyncAfter(deadline: .now() + .seconds(settings.promptTimeout)) { [weak self] in
                 guard let self, let (key, entry) = self.pending.first(where: { $0.value.prompt.id == promptID }) else { return }
                 self.pending[key] = nil
                 self.ipc?.broadcast(.promptResolved(promptID))
                 entry.completions.forEach { $0(.deny, .timeout) }
+            }
+        }
+    }
+
+    /// The last app window disconnected: nobody can answer the waiting prompts.
+    func clientsGone() {
+        queue.async { [self] in
+            let waiting = pending
+            pending.removeAll()
+            for entry in waiting.values {
+                entry.completions.forEach { $0(settings.actionWithoutUI, .noUI) }
             }
         }
     }

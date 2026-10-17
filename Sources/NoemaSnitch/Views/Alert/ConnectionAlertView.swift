@@ -41,7 +41,7 @@ struct ConnectionAlertView: View {
             .frame(width: 560)
             .onAppear { reset(for: prompt) }
             .onChange(of: prompt.id) { reset(for: prompt) }
-            .onReceive(tick) { _ in remaining = max(0, Int(prompt.deadline.timeIntervalSinceNow)) }
+            .onReceive(tick) { _ in remaining = secondsLeft(prompt) }
         }
     }
 
@@ -129,7 +129,9 @@ struct ConnectionAlertView: View {
     private func footer(_ prompt: PromptRequest) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("alert.autoDeny \(remaining)")
+                if prompt.deadline != nil {
+                    Text("alert.autoDeny \(remaining)")
+                }
                 if helper.prompts.count > 1 {
                     Text("alert.more \(helper.prompts.count - 1)")
                 }
@@ -208,7 +210,11 @@ struct ConnectionAlertView: View {
         lifetime = .forever
         expanded = false
         scope = scopes(for: prompt).first ?? .ip(prompt.remoteIP)
-        remaining = max(0, Int(prompt.deadline.timeIntervalSinceNow))
+        remaining = secondsLeft(prompt)
+    }
+
+    private func secondsLeft(_ prompt: PromptRequest) -> Int {
+        prompt.deadline.map { max(0, Int($0.timeIntervalSinceNow)) } ?? 0
     }
 
     private func answer(_ prompt: PromptRequest, _ action: RuleAction) {

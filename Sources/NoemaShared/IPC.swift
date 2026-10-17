@@ -29,12 +29,40 @@ public struct HelperSettings: Codable, Hashable {
     public var mode: FilterMode = .alert
     /// Block UDP 443 so browsers fall back from QUIC to filterable TCP.
     public var blockQUIC = true
-    /// Seconds the prompt waits before denying.
-    public var promptTimeout = 60
+    /// Seconds the prompt waits before denying; 0 = wait until the user answers.
+    public var promptTimeout = 0
     /// What to do when no app is connected to ask the user.
     public var actionWithoutUI: RuleAction = .allow
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case filteringEnabled, mode, blockQUIC, promptTimeout, actionWithoutUI, schema
+    }
+    private static let schema = 2
+
+    /// Missing keys keep their defaults, so adding a setting never resets the others.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = HelperSettings()
+        filteringEnabled = try c.decodeIfPresent(Bool.self, forKey: .filteringEnabled) ?? d.filteringEnabled
+        mode = try c.decodeIfPresent(FilterMode.self, forKey: .mode) ?? d.mode
+        blockQUIC = try c.decodeIfPresent(Bool.self, forKey: .blockQUIC) ?? d.blockQUIC
+        actionWithoutUI = try c.decodeIfPresent(RuleAction.self, forKey: .actionWithoutUI) ?? d.actionWithoutUI
+        let schema = try c.decodeIfPresent(Int.self, forKey: .schema) ?? 1
+        // Schema 1 had a 60 s default; prompts now wait for an answer.
+        promptTimeout = schema < 2 ? 0 : (try c.decodeIfPresent(Int.self, forKey: .promptTimeout) ?? d.promptTimeout)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(filteringEnabled, forKey: .filteringEnabled)
+        try c.encode(mode, forKey: .mode)
+        try c.encode(blockQUIC, forKey: .blockQUIC)
+        try c.encode(promptTimeout, forKey: .promptTimeout)
+        try c.encode(actionWithoutUI, forKey: .actionWithoutUI)
+        try c.encode(Self.schema, forKey: .schema)
+    }
 }
 
 public struct PromptRequest: Codable, Identifiable, Hashable {
@@ -46,10 +74,11 @@ public struct PromptRequest: Codable, Identifiable, Hashable {
     public var remotePort: Int
     /// From TLS SNI or HTTP Host header, when the client sent one.
     public var host: String?
-    public var deadline: Date
+    /// nil = the prompt waits until the user answers.
+    public var deadline: Date?
 
     public init(pid: Int32, executablePath: String, appName: String, remoteIP: String,
-                remotePort: Int, host: String?, deadline: Date) {
+                remotePort: Int, host: String?, deadline: Date?) {
         self.pid = pid
         self.executablePath = executablePath
         self.appName = appName

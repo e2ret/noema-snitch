@@ -58,8 +58,10 @@ final class IPCServer {
             self.handle(message, from: channel)
         }
         channel.onClose = { [weak self] in
-            self?.clients[id] = nil
-            self?.setCount(self?.clients.count ?? 0)
+            guard let self else { return }
+            self.clients[id] = nil
+            self.setCount(self.clients.count)
+            if self.clients.isEmpty { self.engine.clientsGone() }
         }
         clients[id] = channel
         setCount(clients.count)
