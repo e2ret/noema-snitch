@@ -15,7 +15,8 @@ rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
-cp docs/INSTALL.txt "$STAGE/Установка — Install.txt"
+# Plain-text copy of the install guide, without the Markdown badges.
+grep -v "img.shields.io" docs/INSTALL.md > "$STAGE/Установка.txt"
 
 hdiutil create -volname "Noema Snitch" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 echo "Built $DMG ($(du -h "$DMG" | cut -f1))"

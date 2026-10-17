@@ -3,9 +3,13 @@
 # Noema Snitch
 
 [![Translate](https://img.shields.io/badge/Translate-To_Your_Language-red)](https://translate.google.com/translate?sl=auto&u=https://github.com/e2ret/noema-snitch)
+[![Made with Claude Code](https://img.shields.io/badge/Made_with-Claude_Code-D97757)](https://claude.com/claude-code)
 
 Сетевой монитор и файрвол для macOS в духе Little Snitch, написанный с нуля на Swift/SwiftUI.
 Интерфейс на русском и английском (по языку системы). Без платного аккаунта Apple Developer.
+
+Проект полностью сделан с помощью [Claude Code](https://claude.com/claude-code) — от анализа
+оригинала до кода, иконки, документации и релизов.
 
 **Скачать:** [последний релиз](https://github.com/e2ret/noema-snitch/releases/latest) — DMG или zip с приложением.
 
@@ -46,7 +50,7 @@ Noema Snitch вместо этого заворачивает исходящий
 ```
 
 Помощник устанавливается из приложения (Настройки → «Сетевой помощник»).
-Установка на другой Mac — [docs/INSTALL.txt](docs/INSTALL.txt).
+Установка на другой Mac — [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Где хранятся настройки и файлы
 

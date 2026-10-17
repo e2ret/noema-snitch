@@ -1,5 +1,11 @@
 # Noema Snitch — архитектура
 
+[![Translate](https://img.shields.io/badge/Translate-To_Your_Language-red)](https://translate.google.com/translate?sl=auto&u=https://github.com/e2ret/noema-snitch/blob/main/docs/ARCHITECTURE.md)
+[![Made with Claude Code](https://img.shields.io/badge/Made_with-Claude_Code-D97757)](https://claude.com/claude-code)
+
+Проект полностью сделан с помощью [Claude Code](https://claude.com/claude-code): анализ Little Snitch и LuLu
+(REA + Ghidra), архитектура, весь код, иконка, документация и релизы.
+
 Своё приложение-аналог Little Snitch, написанное с нуля на Swift/SwiftUI.
 Интерфейс: русский и английский, язык берётся из системы macOS
 (`CFBundleLocalizations = [en, ru]`). Платный Apple Developer аккаунт не нужен.
@@ -62,7 +68,7 @@
 - Помощник — LaunchDaemon (`RunAtLoad`, `KeepAlive`): стартует при загрузке Mac, до входа
   пользователя; фильтрует трафик всех пользователей; правила общие.
 - Приложение при входе в систему: Настройки → «Открывать при входе» (`SMAppService.mainApp`).
-- Подпись ad-hoc: на другом Mac первый запуск — правый клик → «Открыть» (см. docs/INSTALL.txt).
+- Подпись ad-hoc: на другом Mac первый запуск — правый клик → «Открыть» (см. [docs/INSTALL.md](INSTALL.md)).
 - Лог помощника: `/var/log/noemasnitch.log`. Аварийно: `sudo ./scripts/emergency-off.sh`.
 
 ## Глобус соединений
