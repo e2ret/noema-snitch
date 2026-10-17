@@ -38,17 +38,16 @@ shoot() { # lang
     rm -rf "$out"; mkdir -p "$out"
     defaults write $DOMAIN main.section monitor
     "$BIN" --demo --snapshot "$PWD/$out" --cycle-sections \
-        -AppleLanguages "($1)" -monitor.showChart YES -monitor.showInspector NO >/dev/null 2>&1
+        -AppleLanguages "($1)" -monitor.showChart YES -monitor.showInspector YES >/dev/null 2>&1
     echo "$out"
 }
 
 RU=$(shoot ru)
-EN=$(shoot en)
 
-cp "$(pick "$RU" largest)"          docs/screenshots/monitor-globe-ru.png
-cp "$(pick "$EN" largest)"          docs/screenshots/monitor-en.png
-cp "$(pick "$EN/rules" largest)"    docs/screenshots/rules-en.png
-cp "$(pick "$EN" smallest)"         docs/screenshots/alert-en.png
+cp "$(pick "$RU/monitor" largest)"   docs/screenshots/monitor.png
+cp "$(pick "$RU/rules" largest)"     docs/screenshots/rules.png
+cp "$(pick "$RU/settings" largest)"  docs/screenshots/settings.png
+cp "$(pick "$RU" smallest)"          docs/screenshots/alert.png
+for f in docs/screenshots/*.png; do sips -Z 1600 "$f" >/dev/null; done
 
 echo "Готово: docs/screenshots обновлены (исходники — build/screenshots)."
-open docs/screenshots
