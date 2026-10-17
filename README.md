@@ -83,3 +83,10 @@ Noema Snitch вместо этого заворачивает исходящий
 
 - Контуры суши: [Natural Earth](https://www.naturalearthdata.com) (общественное достояние).
 - IP-геолокация: [DB-IP](https://db-ip.com) City Lite, CC BY 4.0.
+
+## Лицензия
+
+Код — [MIT](LICENSE) © 2026 e2ret. Гео-данные в `Resources/Geo` — под своими лицензиями:
+Natural Earth (общественное достояние) и DB-IP (CC BY 4.0, подпись «IP data by DB-IP» обязательна).
+
+Little Snitch — товарный знак Objective Development; Noema Snitch с ним не связан.
