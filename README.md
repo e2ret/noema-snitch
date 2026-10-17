@@ -1,12 +1,13 @@
-<img src="docs/icon.png" width="128" alt="Noema Snitch icon">
+<img src="docs/icon.png" width="128" alt="Иконка Noema Snitch">
 
 # Noema Snitch
+
+[![Translate](https://img.shields.io/badge/Translate-To_Your_Language-red)](https://translate.google.com/translate?sl=auto&u=https://github.com/e2ret/noema-snitch)
 
 Сетевой монитор и файрвол для macOS в духе Little Snitch, написанный с нуля на Swift/SwiftUI.
 Интерфейс на русском и английском (по языку системы). Без платного аккаунта Apple Developer.
 
-A Little Snitch–style network monitor and firewall for macOS, written from scratch in Swift/SwiftUI.
-Russian and English UI (follows the system language). No paid Apple Developer account required.
+**Скачать:** [последний релиз](https://github.com/e2ret/noema-snitch/releases/latest) — DMG или zip с приложением.
 
 ![Монитор сети](docs/screenshots/monitor.png)
 

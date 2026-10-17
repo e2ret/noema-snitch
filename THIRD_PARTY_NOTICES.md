@@ -1,11 +1,10 @@
-# Third-party notices
+# Сторонние данные
 
+Данные в папке `Resources/Geo` не подпадают под лицензию MIT из файла [LICENSE](LICENSE):
 
-Third-party data in `Resources/Geo` is not covered by the MIT license in [LICENSE](LICENSE):
-
-- Resources/Geo/land.bin — derived from Natural Earth 1:110m land
-  (https://www.naturalearthdata.com), public domain.
-- Resources/Geo/ipcity.bin.lzfse — derived from DB-IP IP to City Lite
-  (https://db-ip.com), licensed under Creative Commons Attribution 4.0
-  International (https://creativecommons.org/licenses/by/4.0/).
-  Attribution "IP data by DB-IP" must be kept.
+- `Resources/Geo/land.bin` — получен из контуров суши Natural Earth 1:110m
+  (https://www.naturalearthdata.com), общественное достояние.
+- `Resources/Geo/ipcity.bin.lzfse` — получен из базы DB-IP IP to City Lite
+  (https://db-ip.com), лицензия Creative Commons Attribution 4.0 International
+  (https://creativecommons.org/licenses/by/4.0/deed.ru).
+  Подпись «IP data by DB-IP» должна сохраняться.
