@@ -86,7 +86,7 @@ Noema Snitch вместо этого заворачивает исходящий
 
 ## Лицензия
 
-Код — [MIT](LICENSE) © 2026 e2ret. Гео-данные в `Resources/Geo` — под своими лицензиями:
+Код — [MIT](LICENSE) © 2026 e2ret. Гео-данные в `Resources/Geo` — под своими лицензиями ([подробнее](THIRD_PARTY_NOTICES.md)):
 Natural Earth (общественное достояние) и DB-IP (CC BY 4.0, подпись «IP data by DB-IP» обязательна).
 
 Little Snitch — товарный знак Objective Development; Noema Snitch с ним не связан.
