@@ -21,16 +21,25 @@ final class PFController {
         self.groupID = groupID
     }
 
-    func install(blockQUIC: Bool) {
+    /// Private, link-local and unique-local ranges: the local network.
+    static let localNetworks = "10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, fc00::/7, fe80::/10"
+
+    func install(blockQUIC: Bool, bypassLocalNetwork: Bool) {
+        // With the bypass, traffic to the local network never reaches the proxy:
+        // no prompts, no delay for routers, NAS, Home Assistant and the like.
+        let target = bypassLocalNetwork ? "! <noema_local>" : "any"
         var rules = """
+        table <noema_local> const { \(Self.localNetworks) }
         rdr pass on lo0 inet proto tcp from any to ! 127.0.0.0/8 -> 127.0.0.1 port \(proxyPort)
         rdr pass on lo0 inet6 proto tcp from any to ! ::1 -> ::1 port \(proxyPort)
-        pass out quick on ! lo0 route-to (lo0 127.0.0.1) inet proto tcp from any to any group != \(groupID) keep state
-        pass out quick on ! lo0 route-to (lo0 ::1) inet6 proto tcp from any to any group != \(groupID) keep state
+        pass out quick on ! lo0 route-to (lo0 127.0.0.1) inet proto tcp from any to \(target) group != \(groupID) keep state
+        pass out quick on ! lo0 route-to (lo0 ::1) inet6 proto tcp from any to \(target) group != \(groupID) keep state
 
         """
         if blockQUIC {
-            rules += "block drop out quick on ! lo0 proto udp from any to any port 443 group != \(groupID)\n"
+            // "return" answers with ICMP unreachable, so browsers fall back to TCP at once
+            // instead of waiting on silently dropped packets.
+            rules += "block return out quick on ! lo0 proto udp from any to \(target) port 443 group != \(groupID)\n"
         }
         let (status, output) = Self.pfctl(["-a", Self.anchor, "-f", "-"], input: rules)
         log("pf rules loaded (status \(status)) \(output)")

@@ -41,6 +41,10 @@ struct SettingsView: View {
                 Picker("settings.mode", selection: setting(\.mode)) {
                     ForEach(FilterMode.allCases, id: \.self) { Text($0.titleKey).tag($0) }
                 }
+                Toggle(isOn: setting(\.allowLocalNetwork)) {
+                    Text("settings.allowLocalNetwork")
+                    Text("settings.allowLocalNetwork.note")
+                }
                 Toggle("settings.blockQUIC", isOn: setting(\.blockQUIC))
                 Picker("settings.promptTimeout", selection: setting(\.promptTimeout)) {
                     Text("settings.noLimit").tag(0)

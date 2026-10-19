@@ -144,3 +144,5 @@
 "section.rules" = "Rules";
 "section.settings" = "Settings";
 "settings.noLimit" = "No limit — wait for my answer";
+"settings.allowLocalNetwork" = "Don't filter the local network";
+"settings.allowLocalNetwork.note" = "10.x, 172.16–31.x, 192.168.x and local IPv6: routers, NAS, Home Assistant — no prompts.";

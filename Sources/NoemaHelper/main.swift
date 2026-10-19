@@ -43,7 +43,7 @@ do {
 
 func applySettings(_ settings: HelperSettings) {
     if settings.filteringEnabled {
-        pf.install(blockQUIC: settings.blockQUIC)
+        pf.install(blockQUIC: settings.blockQUIC, bypassLocalNetwork: settings.allowLocalNetwork)
     } else {
         pf.uninstall()
     }

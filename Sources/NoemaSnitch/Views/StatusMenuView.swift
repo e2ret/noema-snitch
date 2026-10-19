@@ -139,6 +139,8 @@ struct MenuBarIcon: View {
 
     private var icon: String {
         guard helper.isConnected, helper.settings.filteringEnabled else { return "network" }
+        // Something is waiting for an Allow/Deny answer.
+        if !helper.prompts.isEmpty { return "exclamationmark.shield.fill" }
         switch helper.settings.mode {
         case .alert: return "network.badge.shield.half.filled"
         case .silentAllow: return "checkmark.shield"

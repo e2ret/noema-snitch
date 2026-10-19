@@ -144,3 +144,5 @@
 "section.rules" = "Правила";
 "section.settings" = "Настройки";
 "settings.noLimit" = "Без ограничения — ждать ответа";
+"settings.allowLocalNetwork" = "Не фильтровать локальную сеть";
+"settings.allowLocalNetwork.note" = "10.x, 172.16–31.x, 192.168.x и локальный IPv6: роутеры, NAS, Home Assistant — без вопросов.";
