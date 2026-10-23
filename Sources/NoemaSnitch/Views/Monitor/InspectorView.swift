@@ -54,7 +54,7 @@ struct InspectorView: View {
         let rule = matchingRule(app: app, domain: domain, host: host)
         // For the app itself, rules for individual domains count too.
         let appRules = domain == nil
-            ? helper.rules.filter { $0.executablePath == app.executablePath && $0.id != rule?.id }
+            ? helper.rules(forApp: app.executablePath).filter { $0.id != rule?.id }
             : []
         let (text, color): (String, Color) = {
             if let rule { return (RuleText.describe(rule), rule.action == .allow ? Palette.allow : Palette.deny) }
@@ -156,9 +156,10 @@ struct InspectorView: View {
         let name = host?.hostname ?? domain?.name
         let ip = host?.ips.first ?? domain?.name ?? ""
         if domain == nil {
-            return helper.rules.first { $0.executablePath == app.executablePath && $0.host == nil && $0.port == nil }
+            return helper.rules(forApp: app.executablePath).first { $0.host == nil && $0.port == nil }
         }
-        return RuleMatcher.match(helper.rules, executablePath: app.executablePath, host: name, ip: ip, port: 0)
+        return RuleMatcher.match(helper.rules, executablePath: app.executablePath,
+                                 signingID: CodeIdentity.of(app.executablePath), host: name, ip: ip, port: 0)
     }
 
     private func set(_ action: RuleAction, app: AppNode, domain: DomainNode?, host: HostNode?) {

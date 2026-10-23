@@ -18,6 +18,9 @@ public struct Rule: Identifiable, Codable, Hashable {
     public var id = UUID()
     /// Exact executable path, or "*" for any process.
     public var executablePath: String
+    /// Code-signature identity (see CodeIdentity); when set, the rule follows the
+    /// program across updates and path changes.
+    public var signingID: String?
     public var appName: String
     public var action: RuleAction
     /// Host name or IP; "*.example.com" matches subdomains; nil = any host.
@@ -32,8 +35,9 @@ public struct Rule: Identifiable, Codable, Hashable {
 
     public init(executablePath: String, appName: String, action: RuleAction,
                 host: String? = nil, port: Int? = nil,
-                lifetime: RuleLifetime = .forever, pid: Int32? = nil) {
+                lifetime: RuleLifetime = .forever, pid: Int32? = nil, signingID: String? = nil) {
         self.executablePath = executablePath
+        self.signingID = signingID
         self.appName = appName
         self.action = action
         self.host = host
@@ -42,9 +46,15 @@ public struct Rule: Identifiable, Codable, Hashable {
         self.pid = pid
     }
 
-    public func matches(executablePath path: String, host: String?, ip: String, port: Int) -> Bool {
-        guard enabled else { return false }
-        if executablePath != "*" && executablePath != path { return false }
+    /// Same program: any process, the exact path, or the same verified signature.
+    public func matchesProcess(executablePath path: String, signingID: String?) -> Bool {
+        executablePath == "*" || executablePath == path
+            || (self.signingID != nil && self.signingID == signingID)
+    }
+
+    public func matches(executablePath path: String, signingID: String? = nil,
+                        host: String?, ip: String, port: Int) -> Bool {
+        guard enabled, matchesProcess(executablePath: path, signingID: signingID) else { return false }
         if let rulePort = self.port, rulePort != port { return false }
         guard let ruleHost = self.host?.lowercased() else { return true }
         let candidates = [host?.lowercased(), ip.lowercased()].compactMap { $0 }
@@ -62,7 +72,7 @@ public struct Rule: Identifiable, Codable, Hashable {
 
     /// Same target, so a new rule replaces the old one instead of piling up.
     public func sameTarget(as other: Rule) -> Bool {
-        executablePath == other.executablePath
+        (signingID ?? executablePath) == (other.signingID ?? other.executablePath)
             && host?.lowercased() == other.host?.lowercased()
             && port == other.port
     }
@@ -70,10 +80,10 @@ public struct Rule: Identifiable, Codable, Hashable {
 
 public enum RuleMatcher {
     /// Most specific matching rule; on a tie deny wins.
-    public static func match(_ rules: [Rule], executablePath: String,
+    public static func match(_ rules: [Rule], executablePath: String, signingID: String? = nil,
                              host: String?, ip: String, port: Int) -> Rule? {
         rules
-            .filter { $0.matches(executablePath: executablePath, host: host, ip: ip, port: port) }
+            .filter { $0.matches(executablePath: executablePath, signingID: signingID, host: host, ip: ip, port: port) }
             .max { a, b in
                 (a.specificity, a.action == .deny ? 1 : 0) < (b.specificity, b.action == .deny ? 1 : 0)
             }

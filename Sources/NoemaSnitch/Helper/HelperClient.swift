@@ -37,15 +37,16 @@ final class HelperClient: ObservableObject {
 
     /// Creates or replaces the rule for this app and target.
     func setRule(_ action: RuleAction, executablePath: String, appName: String, hostPattern: String?) {
-        if var existing = rules.first(where: {
-            $0.executablePath == executablePath && $0.host == hostPattern && $0.port == nil
+        if var existing = rules(forApp: executablePath).first(where: {
+            $0.host == hostPattern && $0.port == nil
         }) {
             existing.action = action
             existing.lifetime = .forever
             existing.enabled = true
             upsert(existing)
         } else {
-            upsert(Rule(executablePath: executablePath, appName: appName, action: action, host: hostPattern))
+            upsert(Rule(executablePath: executablePath, appName: appName, action: action, host: hostPattern,
+                        signingID: CodeIdentity.of(executablePath)))
         }
     }
 
@@ -75,7 +76,13 @@ final class HelperClient: ObservableObject {
     }
 
     func rule(for path: String, host: String?, ip: String, port: Int) -> Rule? {
-        RuleMatcher.match(rules, executablePath: path, host: host, ip: ip, port: port)
+        RuleMatcher.match(rules, executablePath: path, signingID: CodeIdentity.of(path), host: host, ip: ip, port: port)
+    }
+
+    /// Rules written for this program (by path or by its code signature), not "any process" ones.
+    func rules(forApp path: String) -> [Rule] {
+        let signingID = CodeIdentity.of(path)
+        return rules.filter { $0.executablePath != "*" && $0.matchesProcess(executablePath: path, signingID: signingID) }
     }
 
     // MARK: - Connection

@@ -43,7 +43,7 @@ enum RuleState {
 
 extension HelperClient {
     func ruleState(forApp path: String) -> RuleState {
-        let rules = rules.filter { $0.executablePath == path && $0.enabled }
+        let rules = rules(forApp: path).filter(\.enabled)
         guard !rules.isEmpty else { return .none }
         let actions = Set(rules.map(\.action))
         if actions.count > 1 { return .mixed }
@@ -51,7 +51,8 @@ extension HelperClient {
     }
 
     func ruleState(path: String, host: String?, ip: String) -> RuleState {
-        guard let rule = RuleMatcher.match(rules, executablePath: path, host: host, ip: ip, port: 0) else {
+        guard let rule = RuleMatcher.match(rules, executablePath: path, signingID: CodeIdentity.of(path),
+                                           host: host, ip: ip, port: 0) else {
             return .none
         }
         return rule.action == .allow ? .allow : .deny

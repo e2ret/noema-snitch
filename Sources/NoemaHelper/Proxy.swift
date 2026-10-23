@@ -5,6 +5,8 @@ import NoemaShared
 struct ConnectionRequest {
     let pid: Int32
     let executablePath: String
+    /// Code-signature identity, so rules survive app updates.
+    let signingID: String?
     let appName: String
     let destination: SocketAddress
     let host: String?
@@ -103,6 +105,7 @@ final class Proxy {
         let request = ConnectionRequest(
             pid: owner?.pid ?? 0,
             executablePath: path,
+            signingID: CodeIdentity.of(path),
             appName: AppIdentity.displayName(executablePath: path, processName: owner?.processName ?? "?"),
             destination: destination,
             host: Sniffer.host(fd: fd, timeoutMs: 300)

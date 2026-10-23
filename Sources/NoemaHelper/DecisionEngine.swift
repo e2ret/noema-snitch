@@ -30,6 +30,30 @@ final class DecisionEngine {
         if let data = try? Data(contentsOf: Self.settingsURL), let stored = IPC.decode(HelperSettings.self, from: data) {
             settings = stored
         }
+        migrateToSigningIDs()
+    }
+
+    /// Older rules only knew the path: attach the signature of programs that still
+    /// exist, then keep one rule per program + target (newest wins), so e.g. several
+    /// Claude Code versions collapse into one rule that also covers future versions.
+    private func migrateToSigningIDs() {
+        var changed = false
+        for i in rules.indices where rules[i].signingID == nil && rules[i].executablePath != "*" {
+            if let id = CodeIdentity.of(rules[i].executablePath) {
+                rules[i].signingID = id
+                changed = true
+            }
+        }
+        var kept: [Rule] = []
+        for rule in rules.sorted(by: { $0.created > $1.created }) where !kept.contains(where: { $0.sameTarget(as: rule) }) {
+            kept.append(rule)
+        }
+        if kept.count != rules.count { changed = true }
+        if changed {
+            rules = kept.sorted { $0.created < $1.created }
+            rulesChanged()
+            log("rules migrated to code signatures: \(rules.count) rules")
+        }
     }
 
     // MARK: - Decisions
@@ -45,6 +69,7 @@ final class DecisionEngine {
             dropDeadProcessRules()
 
             if let rule = RuleMatcher.match(rules, executablePath: request.executablePath,
+                                            signingID: request.signingID,
                                             host: request.host, ip: request.destination.ip,
                                             port: Int(request.destination.port)) {
                 return finish(rule.action, .rule)
@@ -120,7 +145,8 @@ final class DecisionEngine {
                             action: verdict.action,
                             host: verdict.hostPattern,
                             lifetime: verdict.lifetime,
-                            pid: verdict.lifetime == .untilQuit ? prompt.pid : nil)
+                            pid: verdict.lifetime == .untilQuit ? prompt.pid : nil,
+                            signingID: entry.request.signingID)
             insert(rule)
             resolvePendingByRules()
         }
@@ -133,6 +159,8 @@ final class DecisionEngine {
     }
 
     func upsert(_ rule: Rule) {
+        var rule = rule
+        if rule.signingID == nil { rule.signingID = CodeIdentity.of(rule.executablePath) }
         queue.async { [self] in
             if let index = rules.firstIndex(where: { $0.id == rule.id }) {
                 rules[index] = rule
@@ -176,7 +204,8 @@ final class DecisionEngine {
     private func resolvePendingByRules() {
         for (key, entry) in pending {
             let p = entry.prompt
-            guard let rule = RuleMatcher.match(rules, executablePath: p.executablePath, host: p.host,
+            guard let rule = RuleMatcher.match(rules, executablePath: p.executablePath,
+                                               signingID: entry.request.signingID, host: p.host,
                                                ip: p.remoteIP, port: p.remotePort) else { continue }
             pending[key] = nil
             ipc?.broadcast(.promptResolved(p.id))
