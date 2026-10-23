@@ -22,19 +22,29 @@ fail() { printf '\033[1;31mОшибка:\033[0m %s\n' "$*" >&2; exit 1; }
 major=$(sw_vers -productVersion | cut -d. -f1)
 [ "$major" -ge 14 ] || fail "Нужна macOS 14 Sonoma или новее (у вас $(sw_vers -productVersion))."
 
+CURL=(curl -fsSL --connect-timeout 15 --retry 3 --retry-delay 2)
+
 say "Ищу последний релиз…"
-release=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest") \
-    || fail "Не удалось связаться с GitHub. Проверьте интернет."
-tag=$(printf '%s' "$release" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-url=$(printf '%s' "$release" | grep '"browser_download_url"' | grep -- '-app\.zip"' | head -1 \
-      | sed -E 's/.*"browser_download_url": *"([^"]+)".*/\1/')
-[ -n "$url" ] || fail "В релизе $tag нет архива приложения."
+tag="" url=""
+if release=$("${CURL[@]}" "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null); then
+    tag=$(printf '%s' "$release" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+    url=$(printf '%s' "$release" | grep '"browser_download_url"' | grep -- '-app\.zip"' | head -1 \
+          | sed -E 's/.*"browser_download_url": *"([^"]+)".*/\1/')
+fi
+if [ -z "$url" ]; then
+    # Запасной путь без API GitHub: тег берём из редиректа страницы последнего релиза.
+    latest=$("${CURL[@]}" -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest") \
+        || fail "Не удалось связаться с GitHub. Проверьте интернет и повторите команду."
+    tag=${latest##*/}
+    case "$tag" in v*) ;; *) fail "Не удалось определить последний релиз." ;; esac
+    url="https://github.com/$REPO/releases/download/$tag/NoemaSnitch-${tag#v}-app.zip"
+fi
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 say "Скачиваю Noema Snitch $tag…"
-curl -fL --progress-bar -o "$tmp/app.zip" "$url" || fail "Не удалось скачать $url"
+curl -fL --progress-bar --connect-timeout 15 --retry 3 --retry-delay 2 -o "$tmp/app.zip" "$url" || fail "Не удалось скачать $url"
 ditto -x -k "$tmp/app.zip" "$tmp" || fail "Архив повреждён."
 [ -d "$tmp/$APP_NAME" ] || fail "В архиве нет $APP_NAME."
 
