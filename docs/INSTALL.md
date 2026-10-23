@@ -3,6 +3,17 @@
 [![Translate](https://img.shields.io/badge/Translate-To_Your_Language-red)](https://translate.google.com/translate?sl=auto&u=https://github.com/e2ret/noema-snitch/blob/main/docs/INSTALL.md)
 [![Made with Claude Code](https://img.shields.io/badge/Made_with-Claude_Code-D97757)](https://claude.com/claude-code)
 
+## Одной командой
+
+Вставьте в Терминал:
+
+    curl -fsSL https://raw.githubusercontent.com/e2ret/noema-snitch/main/install.sh | bash
+
+Скрипт скачает последний релиз, поставит приложение в «Программы», снимет карантин и запустит его.
+Дальше — шаг 3 ниже. Та же команда обновляет до новой версии.
+
+## Вручную
+
 1. Перетащите «Noema Snitch» в папку «Программы».
 2. Первый запуск: приложение не подписано сертификатом Apple, поэтому macOS не откроет его
    двойным щелчком. Щёлкните по приложению правой кнопкой → «Открыть» → «Открыть».

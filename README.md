@@ -11,7 +11,19 @@
 Проект полностью сделан с помощью [Claude Code](https://claude.com/claude-code) — от анализа
 оригинала до кода, иконки, документации и релизов.
 
-**Скачать:** [последний релиз](https://github.com/e2ret/noema-snitch/releases/latest) — DMG или zip с приложением.
+## Установка одной командой
+
+Вставьте в Терминал:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/e2ret/noema-snitch/main/install.sh | bash
+```
+
+Скрипт скачает последний релиз, поставит Noema Snitch в «Программы» (старую версию заменит),
+снимет карантин macOS и запустит приложение. Затем в окне нажмите **«Установить помощника…»**.
+Та же команда обновляет приложение до новой версии; правила и настройки сохраняются.
+
+Вручную: [последний релиз](https://github.com/e2ret/noema-snitch/releases/latest) — DMG или zip с приложением.
 
 ![Монитор сети](docs/screenshots/monitor.png)
 
