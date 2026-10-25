@@ -6,13 +6,14 @@ struct DevicesView: View {
     @State private var selectedDevice: String?
     @State private var selection: DeviceFlow.ID?
     @State private var search = ""
+    @AppStorage("devices.grouped") private var grouped = false
 
     private var visible: [DeviceFlow] {
         proxy.flows.filter { f in
             (selectedDevice == nil || f.device == selectedDevice)
                 && (search.isEmpty
                     || f.host.localizedCaseInsensitiveContains(search)
-                    || (f.app ?? "").localizedCaseInsensitiveContains(search)
+                    || (f.displayApp?.name ?? "").localizedCaseInsensitiveContains(search)
                     || (f.path ?? "").localizedCaseInsensitiveContains(search))
         }
     }
@@ -25,7 +26,7 @@ struct DevicesView: View {
             VStack(spacing: 0) {
                 toolbar
                 Divider()
-                table
+                if grouped { groupedList } else { table }
             }
             Divider()
             FlowInspector(flow: proxy.flows.first { $0.id == selection })
@@ -121,8 +122,30 @@ struct DevicesView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField("devices.search", text: $search).textFieldStyle(.plain)
+            if !search.isEmpty {
+                Button { search = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                    .buttonStyle(.plain)
+            }
             Spacer()
+            Picker("", selection: $grouped) {
+                Text("devices.view.list").tag(false)
+                Text("devices.view.grouped").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
             Text("devices.requests \(visible.count)").font(.caption).foregroundStyle(.secondary)
+            Menu {
+                Button("devices.export.har") { DeviceExport.save(visible, as: .har) }
+                Button("devices.export.csv") { DeviceExport.save(visible, as: .csv) }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .disabled(visible.isEmpty)
+            .help(Text("devices.export"))
             Button("devices.clear", systemImage: "trash") { proxy.clear() }
                 .labelStyle(.iconOnly)
                 .help(Text("devices.clear"))
@@ -138,7 +161,7 @@ struct DevicesView: View {
             }
             .width(min: 64, ideal: 70)
             TableColumn("devices.col.app") { f in
-                Text(verbatim: f.app ?? "—").lineLimit(1)
+                appLabel(f)
             }
             .width(min: 90, ideal: 130)
             TableColumn("devices.col.method") { f in
@@ -179,6 +202,107 @@ struct DevicesView: View {
     }
 
     @ViewBuilder
+    private func appLabel(_ f: DeviceFlow) -> some View {
+        if let app = f.displayApp {
+            Text(verbatim: app.name)
+                .italic(app.isGuess)
+                .foregroundStyle(app.isGuess ? .secondary : .primary)
+                .lineLimit(1)
+                .help(Text(app.isGuess ? "devices.app.guess" : "devices.app.useragent"))
+        } else {
+            Text(verbatim: "—").foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Grouped by app
+
+    private struct HostSummary: Identifiable {
+        let host: String
+        var requests = 0
+        var bytes: Int64 = 0
+        var last = Date.distantPast
+        var errors = 0
+        var id: String { host }
+    }
+
+    private struct AppSummary: Identifiable {
+        let name: String
+        let isGuess: Bool
+        var hosts: [HostSummary]
+        var requests: Int
+        var bytes: Int64
+        var id: String { name }
+    }
+
+    private var groups: [AppSummary] {
+        Dictionary(grouping: visible, by: \.appGroup).map { name, flows in
+            var hosts: [String: HostSummary] = [:]
+            for f in flows {
+                var h = hosts[f.host] ?? HostSummary(host: f.host)
+                h.requests += 1
+                h.bytes += f.sent + f.received
+                h.last = max(h.last, f.started)
+                if f.error != nil { h.errors += 1 }
+                hosts[f.host] = h
+            }
+            return AppSummary(name: name,
+                              isGuess: flows.first?.displayApp?.isGuess ?? true,
+                              hosts: hosts.values.sorted { $0.bytes > $1.bytes },
+                              requests: flows.count,
+                              bytes: flows.reduce(0) { $0 + $1.sent + $1.received })
+        }
+        .sorted { $0.bytes > $1.bytes }
+    }
+
+    private var groupedList: some View {
+        List {
+            ForEach(groups) { g in
+                Section {
+                    ForEach(g.hosts) { h in
+                        Button {
+                            search = h.host
+                            grouped = false
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "globe").foregroundStyle(.secondary)
+                                Text(verbatim: h.host).lineLimit(1)
+                                if h.errors > 0 {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(.orange).font(.caption)
+                                }
+                                Spacer()
+                                Text("devices.requests \(h.requests)").font(.caption).foregroundStyle(.secondary)
+                                Text(verbatim: formatBytes(h.bytes)).font(.caption).monospacedDigit()
+                                    .frame(width: 70, alignment: .trailing)
+                                Text(h.last, format: .dateTime.hour().minute().second())
+                                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(Text("devices.group.open"))
+                    }
+                } header: {
+                    HStack {
+                        Text(verbatim: g.name).font(.headline).italic(g.isGuess)
+                        Spacer()
+                        Text("devices.group.summary \(g.hosts.count) \(g.requests)")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(verbatim: formatBytes(g.bytes)).font(.caption.weight(.semibold)).monospacedDigit()
+                    }
+                }
+            }
+        }
+        .listStyle(.inset)
+        .overlay {
+            if visible.isEmpty {
+                ContentUnavailableView("devices.empty.title", systemImage: "iphone.radiowaves.left.and.right",
+                                       description: Text(proxy.isRunning ? "devices.empty.waiting" : "devices.empty.off"))
+            }
+        }
+    }
+
+    @ViewBuilder
     private func statusView(_ f: DeviceFlow) -> some View {
         if f.error != nil {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -200,7 +324,8 @@ private struct FlowInspector: View {
         ScrollView {
             if let f = flow {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(verbatim: f.app ?? f.host).font(.title3.bold()).lineLimit(2)
+                    Text(verbatim: f.displayApp?.name ?? f.host).font(.title3.bold())
+                        .italic(f.displayApp?.isGuess == true).lineLimit(2)
                     Text(verbatim: f.url).font(.callout).textSelection(.enabled).foregroundStyle(.secondary)
                     if f.isHTTPS {
                         Label("devices.https.encrypted", systemImage: "lock.fill")

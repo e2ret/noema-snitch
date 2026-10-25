@@ -29,10 +29,16 @@ struct DeviceFlow: Identifiable, Hashable {
 
     /// The iOS app, from the User-Agent iOS sends with each request:
     /// "Telegram/11.2 CFNetwork/1568 Darwin/24.0.0" → "Telegram".
+    /// "Home Assistant/2024.10 (…)" → "Home Assistant", "Instagram 352.0 (iPhone…)" → "Instagram".
     var app: String? {
-        guard let ua = userAgent, let first = ua.split(separator: " ").first else { return nil }
-        if first.hasPrefix("Mozilla") { return nil }  // a browser or web view
-        let name = first.split(separator: "/").first.map(String.init) ?? String(first)
+        guard let ua = userAgent?.trimmingCharacters(in: .whitespaces), !ua.isEmpty,
+              !ua.hasPrefix("Mozilla") else { return nil }  // browsers and web views
+        var name = String(ua.prefix { $0 != "/" && $0 != "(" })
+        // Drop a trailing version ("Instagram 352.0") and spaces.
+        var words = name.split(separator: " ")
+        while words.count > 1, let last = words.last, last.first?.isNumber == true { words.removeLast() }
+        name = words.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return nil }
         return name.removingPercentEncoding ?? name
     }
 }
