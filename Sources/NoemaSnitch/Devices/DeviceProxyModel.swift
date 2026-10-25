@@ -1,5 +1,7 @@
+import AppKit
 import Darwin
 import Foundation
+import UniformTypeIdentifiers
 
 /// State of the "Devices" section: the proxy for phones/tablets and what they send through it.
 @MainActor
@@ -11,6 +13,8 @@ final class DeviceProxyModel: ObservableObject {
         var sent: Int64 = 0
         var received: Int64 = 0
         var lastSeen = Date.distantPast
+        /// Requests refused by access control.
+        var blocked = 0
         var id: String { address }
     }
 
@@ -21,6 +25,15 @@ final class DeviceProxyModel: ObservableObject {
     @Published var port: Int {
         didSet { UserDefaults.standard.set(port, forKey: Self.portKey) }
     }
+    /// Access control, recording, throttling and the external proxy.
+    @Published var config: DeviceProxyConfig {
+        didSet {
+            if let data = try? JSONEncoder().encode(config) { UserDefaults.standard.set(data, forKey: Self.configKey) }
+            server.apply(config)
+        }
+    }
+    /// Title of a session opened from a file, nil while showing live traffic.
+    @Published private(set) var openedSession: String?
 
     /// Called when the proxy starts, so Noema's own outgoing traffic can be allowed.
     var onStart: (() -> Void)?
@@ -32,10 +45,14 @@ final class DeviceProxyModel: ObservableObject {
     private static let maxFlows = 5000
     private static let enabledKey = "deviceProxy.enabled"
     private static let portKey = "deviceProxy.port"
+    private static let configKey = "deviceProxy.config"
 
     init() {
         let saved = UserDefaults.standard.integer(forKey: Self.portKey)
         port = saved > 0 ? saved : 8888
+        config = UserDefaults.standard.data(forKey: Self.configKey)
+            .flatMap { try? JSONDecoder().decode(DeviceProxyConfig.self, from: $0) } ?? DeviceProxyConfig()
+        server.apply(config)
         server.onFailure = { [weak self] message in
             DispatchQueue.main.async {
                 self?.error = message
@@ -102,6 +119,65 @@ final class DeviceProxyModel: ObservableObject {
         flows.removeAll()
         index.removeAll()
         devices.removeAll()
+        openedSession = nil
+    }
+
+    // MARK: - Access control and recording
+
+    func allow(_ device: String) {
+        config.allowedDevices.insert(device)
+        devices[device]?.blocked = 0
+    }
+
+    func revoke(_ device: String) {
+        config.allowedDevices.remove(device)
+    }
+
+    func isAllowed(_ device: String) -> Bool {
+        config.access == .localNetwork || config.allowedDevices.contains(device)
+    }
+
+    func toggleRecording() {
+        config.recording.toggle()
+    }
+
+    // MARK: - Sessions
+
+    private struct SessionFile: Codable {
+        var version = 1
+        var saved = Date()
+        var flows: [DeviceFlow]
+    }
+
+    func saveSession() {
+        let panel = NSSavePanel()
+        let stamp = ISO8601DateFormatter.string(from: Date(), timeZone: .current, formatOptions: [.withFullDate])
+        panel.nameFieldStringValue = "NoemaSnitch-\(stamp).noemasession"
+        panel.allowedContentTypes = [UTType(filenameExtension: "noemasession") ?? .json]
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(SessionFile(flows: flows)) {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    func openSession() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "noemasession") ?? .json]
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: url),
+              let file = try? decoder.decode(SessionFile.self, from: data) else {
+            error = String(localized: "devices.session.badFile")
+            return
+        }
+        clear()
+        for flow in file.flows.reversed() { ingest(flow) }
+        openedSession = url.deletingPathExtension().lastPathComponent
     }
 
     func loadDemo() {
@@ -125,15 +201,40 @@ final class DeviceProxyModel: ObservableObject {
             flow.sent = s.5
             flow.received = s.6
             flow.ended = flow.started.addingTimeInterval(Double(i) * 0.7 + 0.3)
+            flow.timing = FlowTiming(dns: 0.012, connect: 0.034, tls: flow.isHTTPS ? 0.061 : nil, firstByte: 0.18)
+            flow.remoteIP = "149.154.167.\(40 + i)"
+            if flow.isHTTPS {
+                var tls = TLSInfo()
+                tls.sni = s.2
+                tls.clientVersions = ["GREASE", "TLSv1.3", "TLSv1.2"]
+                tls.clientCiphers = ["GREASE", "TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384",
+                                     "TLS_CHACHA20_POLY1305_SHA256", "ECDHE_ECDSA_AES_256_GCM_SHA384"]
+                tls.clientALPN = ["h2", "http/1.1"]
+                tls.clientExtensions = 16
+                tls.serverVersion = "TLSv1.3"
+                tls.serverCipher = "TLS_AES_128_GCM_SHA256"
+                tls.serverExtensions = 2
+                tls.resumed = i % 2 == 0
+                flow.tls = tls
+            }
             ingest(flow)
         }
+        var refused = DeviceFlow(id: UUID(), device: "10.0.1.77", started: now, method: "CONNECT", isHTTPS: true,
+                                 host: "www.google.com", port: 443, path: nil, userAgent: nil)
+        refused.blocked = true
+        refused.status = 403
+        refused.error = "access denied"
+        refused.ended = now
+        ingest(refused)
         devices["10.0.1.42"]?.name = "iPhone-Eduard.lan"
         devices["10.0.1.57"]?.name = "iPad.lan"
         isRunning = true
     }
 
     private func pull() {
-        for flow in server.drainChanges() { ingest(flow) }
+        let changes = server.drainChanges()
+        guard openedSession == nil else { return }  // a saved session is on screen
+        for flow in changes { ingest(flow) }
     }
 
     private func ingest(_ flow: DeviceFlow) {
@@ -155,6 +256,7 @@ final class DeviceProxyModel: ObservableObject {
     private func account(_ flow: DeviceFlow, previous: DeviceFlow?) {
         var device = devices[flow.device] ?? Device(address: flow.device)
         if previous == nil { device.requests += 1 }
+        if flow.blocked && previous?.blocked != true { device.blocked += 1 }
         device.sent += flow.sent - (previous?.sent ?? 0)
         device.received += flow.received - (previous?.received ?? 0)
         device.lastSeen = Date()

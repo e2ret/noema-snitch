@@ -12,6 +12,7 @@ struct DevicesView: View {
         proxy.flows.filter { f in
             (selectedDevice == nil || f.device == selectedDevice)
                 && (search.isEmpty
+                    || f.displayHost.localizedCaseInsensitiveContains(search)
                     || f.host.localizedCaseInsensitiveContains(search)
                     || (f.displayApp?.name ?? "").localizedCaseInsensitiveContains(search)
                     || (f.path ?? "").localizedCaseInsensitiveContains(search))
@@ -31,6 +32,10 @@ struct DevicesView: View {
             Divider()
             FlowInspector(flow: proxy.flows.first { $0.id == selection })
                 .frame(width: 300)
+        }
+        .onAppear {
+            // Screenshots: show a selected HTTPS request with its TLS and timing details.
+            if Demo.isEnabled { selection = proxy.flows.first { $0.tls != nil }?.id }
         }
     }
 
@@ -79,11 +84,14 @@ struct DevicesView: View {
                 .padding(10)
                 .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
 
+                settingsCard
+
                 Text("devices.list").font(.subheadline.weight(.semibold))
                 deviceRow(nil, title: Text("devices.all"), subtitle: Text("devices.requests \(proxy.flows.count)"))
                 ForEach(proxy.sortedDevices) { d in
                     deviceRow(d.address, title: Text(verbatim: d.name ?? d.address),
-                              subtitle: Text(verbatim: "\(d.address) · \(formatBytes(d.sent + d.received))"))
+                              subtitle: Text(verbatim: "\(d.address) · \(formatBytes(d.sent + d.received))"),
+                              device: d)
                 }
                 if proxy.devices.isEmpty {
                     Text("devices.none").font(.caption).foregroundStyle(.secondary)
@@ -94,7 +102,52 @@ struct DevicesView: View {
         }
     }
 
-    private func deviceRow(_ address: String?, title: Text, subtitle: Text) -> some View {
+    /// Access control, throttling and the external proxy.
+    private var settingsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("devices.settings").font(.subheadline.weight(.semibold))
+
+            Text("devices.access").font(.caption).foregroundStyle(.secondary)
+            Picker("devices.access", selection: $proxy.config.access) {
+                Text("devices.access.local").tag(DeviceProxyConfig.Access.localNetwork)
+                Text("devices.access.selected").tag(DeviceProxyConfig.Access.selected)
+            }
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+            Text(proxy.config.access == .selected ? "devices.access.selected.note" : "devices.access.local.note")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("devices.throttle").font(.caption).foregroundStyle(.secondary)
+            Picker("devices.throttle", selection: $proxy.config.throttle) {
+                ForEach(ThrottleProfile.allCases) { p in
+                    Text(LocalizedStringKey("throttle." + p.rawValue)).tag(p)
+                }
+            }
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+
+            Toggle("devices.upstream", isOn: $proxy.config.upstreamEnabled)
+            if proxy.config.upstreamEnabled {
+                HStack(spacing: 4) {
+                    TextField("devices.upstream.host", text: $proxy.config.upstreamHost)
+                        .font(.system(.body, design: .monospaced))
+                    Text(verbatim: ":")
+                    TextField("", value: $proxy.config.upstreamPort, format: .number.grouping(.never))
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 60)
+                }
+                Text("devices.upstream.note")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .controlSize(.small)
+        .padding(10)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func deviceRow(_ address: String?, title: Text, subtitle: Text, device: DeviceProxyModel.Device? = nil) -> some View {
         Button {
             selectedDevice = address
         } label: {
@@ -105,6 +158,14 @@ struct DevicesView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     title.lineLimit(1)
                     subtitle.font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    if let address, !proxy.isAllowed(address) {
+                        HStack(spacing: 6) {
+                            Label("devices.notAllowed", systemImage: "hand.raised.fill")
+                                .font(.caption).foregroundStyle(.red)
+                            Button("devices.allow") { proxy.allow(address) }
+                                .controlSize(.mini)
+                        }
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -114,6 +175,15 @@ struct DevicesView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let address {
+                if proxy.config.allowedDevices.contains(address) {
+                    Button("devices.revoke") { proxy.revoke(address) }
+                } else {
+                    Button("devices.allow") { proxy.allow(address) }
+                }
+            }
+        }
     }
 
     // MARK: - Requests
@@ -135,16 +205,29 @@ struct DevicesView: View {
             .labelsHidden()
             .fixedSize()
             Text("devices.requests \(visible.count)").font(.caption).foregroundStyle(.secondary)
+            Button {
+                proxy.toggleRecording()
+            } label: {
+                Image(systemName: proxy.config.recording ? "pause.circle" : "record.circle")
+                    .foregroundStyle(proxy.config.recording ? Color.primary : Color.red)
+            }
+            .buttonStyle(.borderless)
+            .help(Text(proxy.config.recording ? "devices.recording.pause" : "devices.recording.resume"))
             Menu {
+                Button("devices.session.open") { proxy.openSession() }
+                Button("devices.session.save") { proxy.saveSession() }
+                    .disabled(proxy.flows.isEmpty)
+                Divider()
                 Button("devices.export.har") { DeviceExport.save(visible, as: .har) }
+                    .disabled(visible.isEmpty)
                 Button("devices.export.csv") { DeviceExport.save(visible, as: .csv) }
+                    .disabled(visible.isEmpty)
             } label: {
                 Image(systemName: "square.and.arrow.up")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .disabled(visible.isEmpty)
             .help(Text("devices.export"))
             Button("devices.clear", systemImage: "trash") { proxy.clear() }
                 .labelStyle(.iconOnly)
@@ -152,6 +235,29 @@ struct DevicesView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let name = proxy.openedSession {
+                HStack {
+                    Label("devices.session.viewing \(name)", systemImage: "doc.text")
+                    Spacer()
+                    Button("devices.session.backToLive") { proxy.clear() }
+                }
+                .font(.caption)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.accentColor.opacity(0.12))
+            } else if !proxy.config.recording {
+                HStack {
+                    Label("devices.recording.paused", systemImage: "pause.circle.fill").foregroundStyle(.red)
+                    Spacer()
+                    Button("devices.recording.resume") { proxy.toggleRecording() }
+                }
+                .font(.caption)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.red.opacity(0.08))
+            }
+        }
     }
 
     private var table: some View {
@@ -171,11 +277,19 @@ struct DevicesView: View {
             }
             .width(min: 50, ideal: 60)
             TableColumn("devices.col.host") { f in
-                Text(verbatim: f.port == (f.isHTTPS ? 443 : 80) ? f.host : "\(f.host):\(f.port)").lineLimit(1)
+                Text(verbatim: f.port == (f.isHTTPS ? 443 : 80) ? f.displayHost : "\(f.displayHost):\(f.port)")
+                    .lineLimit(1)
+                    .help(f.remoteIP.map { Text(verbatim: $0) } ?? Text(verbatim: f.host))
             }
             .width(min: 140, ideal: 220)
             TableColumn("devices.col.path") { f in
-                Text(verbatim: f.path ?? "🔒").lineLimit(1).foregroundStyle(f.path == nil ? .secondary : .primary)
+                if let path = f.path {
+                    Text(verbatim: path).lineLimit(1)
+                } else {
+                    // HTTPS: no path, but the handshake tells the protocol.
+                    let tls = [f.tls?.serverVersion, f.tls?.clientALPN.first].compactMap { $0 }.joined(separator: " · ")
+                    Text(verbatim: "🔒 " + tls).lineLimit(1).foregroundStyle(.secondary)
+                }
             }
             .width(min: 80, ideal: 160)
             TableColumn("devices.col.status") { f in
@@ -238,12 +352,12 @@ struct DevicesView: View {
         Dictionary(grouping: visible, by: \.appGroup).map { name, flows in
             var hosts: [String: HostSummary] = [:]
             for f in flows {
-                var h = hosts[f.host] ?? HostSummary(host: f.host)
+                var h = hosts[f.displayHost] ?? HostSummary(host: f.displayHost)
                 h.requests += 1
                 h.bytes += f.sent + f.received
                 h.last = max(h.last, f.started)
                 if f.error != nil { h.errors += 1 }
-                hosts[f.host] = h
+                hosts[f.displayHost] = h
             }
             return AppSummary(name: name,
                               isGuess: flows.first?.displayApp?.isGuess ?? true,
@@ -304,7 +418,9 @@ struct DevicesView: View {
 
     @ViewBuilder
     private func statusView(_ f: DeviceFlow) -> some View {
-        if f.error != nil {
+        if f.blocked {
+            Image(systemName: "hand.raised.fill").foregroundStyle(.red).help(Text("devices.notAllowed"))
+        } else if f.error != nil {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
         } else if let status = f.status {
             Text(verbatim: String(status)).monospacedDigit()
@@ -337,12 +453,13 @@ private struct FlowInspector: View {
                     Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 6) {
                         row("devices.col.method", f.isHTTPS ? "CONNECT (HTTPS)" : f.method)
                         row("devices.col.host", "\(f.host):\(f.port)")
+                        if let ip = f.remoteIP, ip != f.host { row("devices.remoteIP", ip) }
+                        if f.viaUpstream { row("devices.route", RuleText.localized("devices.route.upstream")) }
                         if let path = f.path { row("devices.col.path", path) }
                         if let status = f.status { row("devices.col.status", String(status)) }
                         row("devices.device", f.device)
                         row("devices.sent", formatBytes(f.sent))
                         row("devices.received", formatBytes(f.received))
-                        if let d = f.duration { row("devices.col.duration", String(format: "%.2f s", d)) }
                         GridRow {
                             Text("devices.col.time").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
                             Text(f.started, format: .dateTime.day().month().hour().minute().second())
@@ -350,6 +467,12 @@ private struct FlowInspector: View {
                         if let error = f.error { row("devices.error", error) }
                     }
                     .font(.callout)
+
+                    TimingView(flow: f)
+
+                    if let tls = f.tls {
+                        TLSView(tls: tls)
+                    }
                     if let ua = f.userAgent {
                         Text("devices.useragent").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         Text(verbatim: ua).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
@@ -365,6 +488,84 @@ private struct FlowInspector: View {
             }
         }
         .background(.background)
+    }
+
+    private func row(_ title: LocalizedStringKey, _ value: String) -> some View {
+        GridRow {
+            Text(title).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+            Text(verbatim: value).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Phases of a request as stacked bars: DNS, connect, TLS, first byte, total.
+private struct TimingView: View {
+    let flow: DeviceFlow
+
+    private var phases: [(LocalizedStringKey, TimeInterval?, Color)] {
+        [("timing.dns", flow.timing.dns, .purple),
+         ("timing.connect", flow.timing.connect, .orange),
+         ("timing.tls", flow.timing.tls, .green),
+         ("timing.firstByte", flow.timing.firstByte, .blue),
+         ("timing.total", flow.duration, .gray)]
+    }
+
+    var body: some View {
+        let longest = max(phases.compactMap(\.1).max() ?? 0, 0.001)
+        VStack(alignment: .leading, spacing: 5) {
+            Text("timing.title").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            ForEach(Array(phases.enumerated()), id: \.offset) { _, phase in
+                if let value = phase.1 {
+                    HStack(spacing: 8) {
+                        Text(phase.0).font(.caption).frame(width: 92, alignment: .trailing).foregroundStyle(.secondary)
+                        GeometryReader { geo in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(phase.2.opacity(0.7))
+                                .frame(width: max(2, geo.size.width * value / longest))
+                        }
+                        .frame(height: 8)
+                        Text(verbatim: Self.format(value)).font(.caption).monospacedDigit().frame(width: 58, alignment: .trailing)
+                    }
+                }
+            }
+        }
+    }
+
+    static func format(_ t: TimeInterval) -> String {
+        t < 1 ? String(format: "%.0f ms", t * 1000) : String(format: "%.2f s", t)
+    }
+}
+
+/// What the TLS handshake revealed — like Charles' "SSL" tab.
+private struct TLSView: View {
+    let tls: TLSInfo
+    @State private var showCiphers = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("tls.title").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
+                if let sni = tls.sni { row("tls.sni", sni) }
+                row("tls.protocol", tls.serverVersion ?? "—")
+                row("tls.clientVersions", tls.clientVersions.filter { $0 != "GREASE" }.joined(separator: ", "))
+                row("tls.cipher", tls.serverCipher ?? "—")
+                row("tls.alpn", tls.clientALPN.isEmpty ? "—" : tls.clientALPN.joined(separator: ", "))
+                if let chosen = tls.serverALPN { row("tls.alpnChosen", chosen) }
+                if let resumed = tls.resumed {
+                    row("tls.resumed", RuleText.localized(resumed ? "tls.yes" : "tls.no"))
+                }
+                row("tls.extensions", "\(tls.clientExtensions) / \(tls.serverExtensions)")
+            }
+            .font(.caption)
+            DisclosureGroup(isExpanded: $showCiphers) {
+                Text(verbatim: tls.clientCiphers.joined(separator: "\n"))
+                    .font(.system(.caption2, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } label: {
+                Text("tls.clientCiphers \(tls.clientCiphers.count)").font(.caption)
+            }
+        }
     }
 
     private func row(_ title: LocalizedStringKey, _ value: String) -> some View {
