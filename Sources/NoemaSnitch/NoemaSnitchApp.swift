@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let monitor = ConnectionMonitor()
     let helper = HelperClient()
     let model = NetworkModel()
+    let deviceProxy = DeviceProxyModel()
     private var presenter: PromptPresenter?
     private var subscriptions = Set<AnyCancellable>()
     private var ticker: Timer?
@@ -20,6 +21,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         presenter = PromptPresenter(helper: helper)
         helper.onTraffic = { [model] date, entries in model.ingest(date: date, entries: entries) }
         helper.onEvent = { [model] event in model.ingest(event: event) }
+        // The device proxy connects out on the phone's behalf: allow that without prompts.
+        deviceProxy.onStart = { [helper] in
+            guard let path = Bundle.main.executablePath,
+                  !helper.rules(forApp: path).contains(where: { $0.host == nil && $0.action == .allow }) else { return }
+            helper.setRule(.allow, executablePath: path, appName: "Noema Snitch", hostPattern: nil)
+        }
         // Without the helper, fall back to what libproc shows for the current user.
         monitor.$connections
             .sink { [weak self] connections in
@@ -32,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if Demo.isEnabled {
             Demo.load(model: model, helper: helper)
+            deviceProxy.loadDemo()
         }
         // SwiftUI may skip opening the main window when a menu bar extra exists.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -67,6 +75,7 @@ struct NoemaSnitchApp: App {
                 .environmentObject(delegate.model)
                 .environmentObject(delegate.helper)
                 .environmentObject(delegate.monitor)
+                .environmentObject(delegate.deviceProxy)
                 .frame(minWidth: 760, minHeight: 520)
         }
         .defaultSize(width: 1180, height: 720)

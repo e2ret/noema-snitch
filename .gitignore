@@ -6,3 +6,6 @@ node_modules/
 # Reference apps for analysis only — third-party, never commit
 Little Snitch.app/
 LuLu.app/
+Charles.app/
+# Any other third-party .app dropped here for analysis
+/*.app/

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MainSection: String, CaseIterable, Identifiable {
-    case monitor, rules, settings
+    case monitor, rules, devices, settings
     var id: String { rawValue }
 
     static let storageKey = "main.section"
@@ -10,6 +10,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         switch self {
         case .monitor: "section.monitor"
         case .rules: "section.rules"
+        case .devices: "section.devices"
         case .settings: "section.settings"
         }
     }
@@ -18,6 +19,7 @@ enum MainSection: String, CaseIterable, Identifiable {
         switch self {
         case .monitor: "network"
         case .rules: "list.bullet.rectangle"
+        case .devices: "iphone"
         case .settings: "gearshape"
         }
     }
@@ -41,6 +43,8 @@ struct MainView: View {
                 MonitorView()
             case .rules:
                 RulesWindowView()
+            case .devices:
+                DevicesView()
             case .settings:
                 ScrollView {
                     SettingsView()
